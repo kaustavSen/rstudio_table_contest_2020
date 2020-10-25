@@ -1,0 +1,420 @@
+---
+title: "A first stroll through the `gt` package"
+author: "Kaustav Sen"
+date: "September 25, 2020"
+output: 
+  distill::distill_article:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Motivation
+
+It was around two weeks ago that I finally decided to take a plunge into learning the [gt](https://gt.rstudio.com/) package for creating static HTML tables. **Thomas Mock** has some amazing blog posts of the package on his [website](https://themockup.blog/) which got me started and culminated in me posting my first `gt` based table as part of the weekly [#TidyTuesday](https://github.com/rfordatascience/tidytuesday) challenge on twitter.
+
+```{r tweet, echo=FALSE}
+tweetrmd::include_tweet("https://twitter.com/kustav_sen/status/1320024371193208833")
+```
+
+So in this post I wanted to go over and document my learning process and in the process share some of the neat ticks I picked up along the way. Since I am still fairly new to this package I am open to any comments/feedback but my primary objectives with this are:
+
+-   Reinforcing my learning by documenting about it; and
+
+-   Curating a document which others might also find useful.
+
+We will be replicating the table in the tweet above step-by-step:
+
+-   using conditional formatting to highlight data values
+-   adding custom fonts to make the table aesthetically pleasing
+-   inserting `ggplot` bar-charts within a `gt` table and much more.
+
+Hope that whets your appetite to read on. Now, let's get started!
+
+## Initial setup and reading in the data
+
+We will be using the `tidyverse` set of packages to read in the data and perform some initial prepping up before it is processed by `gt`.
+
+So, let's first load up the packages.
+
+```{r load-packages, warning=FALSE, message=FALSE}
+library(tidyverse) # for reading in and wrangling the data
+library(gt) # for awesome tables
+```
+
+The data comes from 2020 Week 43 of the \#TidyTuesday challenge. It is about the **Great American Beer Festival** and you can read more about it [here](https://github.com/rfordatascience/tidytuesday/blob/master/data/2020/2020-10-20/readme.md).
+
+```{r read-data, message=FALSE}
+beer_awards <- readr::read_csv("https://git.io/JTrx9")
+```
+
+With the data now loaded in, we will now perform some initial wrangling using `dplyr` and `tidyr` verbs. We will be creating a table of the all top 10 breweries with the most number of medals over all years from 1987-2020.
+
+The code below does the following:
+
+-   use the `count` function to count the number of medals (gold, silver and bronze) won by each brewery. Since we are **not** grouping by year, it will count the total number of medals over all years from 1987-2020 which is what we want
+
+-   next we want to *pivot* the table so that the column headers contain Gold, Silver and Bronze, with the respective counts filling up as the row values. So, instead of three row (at max) for each brewery, we will now have exactly one row per brewery. We achieve this using the `pivot_wider` function
+
+-   finally we want to select just the top 10 breweries. Before we do that we much first `arrange` the breweries. Here I am ordering them by the number of gold medals won (this is generally the approach used when ranking countries in sport events such as the Olympics but you could have used any other logic as well).
+
+```{r wrangle}
+top_10_breweries <- 
+  beer_awards %>% 
+  count(brewery, medal) %>% 
+  pivot_wider(names_from = medal, values_from = n) %>% 
+  arrange(desc(Gold)) %>% 
+  head(10)
+
+top_10_breweries
+```
+
+With our table data now ready, we can proceed to creating a beautiful `gt` from it.
+
+## A simple `gt` table
+
+`gt` is also based on the `tidyverse` mantra of:
+
+> *Use simple and easy-to-use functions which do just one thing but do it extremely well*
+
+Essentially, it provides a (g)**rammar** of (t)**ables** to manipulate the various components. The diagram below has been taken from the [gt](https://gt.rstudio.com/) website and shows the anatomy of a table:
+
+![parts of a gt table](https://gt.rstudio.com/reference/figures/gt_parts_of_a_table.svg)
+
+This might look daunting at first, but fret not! With knowledge of just a few functions you can go a long way to beautifying your tables.
+
+Also, all `gt` functions support the `%>%` operator. So, if you are coming from the `tidyverse` ecosystem, you will feel completely at home!
+
+Every `gt` table start with the `gt()` function which takes as the first argument a dataframe.
+
+```{r step-1}
+gt_table_step_1 <- gt(top_10_breweries)
+gt_table_step_1
+```
+
+And viola! With just one line of code, you have created your first `gt` table 🎉
+
+## Styling your tables with `tab_style()`
+
+By default, `gt` applies some nice formatting to make your table look pleasing. However, using the `tab_style()` function you can target specific table components and customize their appearance to your heart's desire.
+
+This function takes two main arguments:
+
+- `style` which specifies what styles you want to apply to the *cells* of your table. You use the `cell_*` family of functions to specify style. If you want to apply multiple `cell_*` functions, you can pass them together as a list.
+
+- `locations` which specify *where* you want to apply the styles. You use the `cells_*` family of functions to target the different the various components of the table.
+
+Notice how the `style` argument uses the singular form of the word "**cell**" while the `locations` argument uses the plural form "**cells**". I like to think of this as: you specify the `style` for *a cell* but then apply it to *a group of cells*.
+
+If you dig deeper into the `beer_awards` dataset, you'll discover that Firestone Walker Brewing Co. and Marin Brewing Co. breweries are based out of California. Using our newly aquired knowledge of the `tab_style()` function, lets highlight these in a different color.
+
+```{r step-2}
+gt_table_step_2 <- gt_table_step_1 %>% 
+  tab_style(
+    style = cell_text(color = "#F2CB05", weight = "bold"),
+    locations = cells_body(
+      columns = 1, 
+      rows = brewery %in% c("Firestone Walker Brewing Co.", "Marin Brewing Co.")
+    )
+  )
+
+gt_table_step_2
+```
+
+Notice how I used location number to specify the column while referred to the actual column name to specify the condition based on the brewery name. `gt` give you the flexibility to reference both by location index as well as by actual column names.
+
+## Adding headers and using custom fonts
+
+### Headers
+
+Use can use the `tab_header()` function to add a title and a subtitle to your table.
+
+You can also add a pseudo-title or a "spanner" for a group of columns using the `tab_spanner()` function.
+
+### Fonts
+
+The Google Fonts website: https://fonts.google.com/ gives you access to a vast collection of custom fonts that you can in our tables. The `gt` package has a `google_font()` function which gives you a super easy way to access these fonts - you just specify the font name as it just works!
+
+Selecting fonts is an art onto itself but I'll confess that I am no master at it. However, a cardinal rule that I generally stick to is to use "mono" typefaces for numbers so that all the digits align correctly. The default fonts take care of this plus other subtle points but I'll always fun to experiment with new and interesting font faces.
+
+Let's get cracking at adding some headers and using custom fonts in our table.
+
+```{r step-3}
+gt_table_step_3 <- gt_table_step_2 %>% 
+  tab_header(
+    title = "Great American Beer Festival",
+    subtitle = html(
+      "<span style = 'color: grey'>All time top 10 breweries of which 2 
+      are <span style = 'color: #F2CB05'><b>California</b></span> based</span>"
+    )
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("Titan One"), 
+      align = "left", 
+      size = "xx-large"
+    ),
+    locations = cells_title("title")
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Sans"), 
+      align = "left", 
+      size = "large"
+    ),
+    locations = cells_title("subtitle")
+  ) %>% 
+  tab_style(
+    style = cell_borders(
+      sides = "bottom", 
+      color = "#ebe8e8", 
+      weight = px(2)
+    ),
+    locations = cells_title("subtitle")
+  ) %>%
+  tab_spanner(
+    label = "Medals Won",
+    columns = 2:4
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Sans"), 
+      size = "large"
+    ),
+    locations = list(
+      cells_column_labels(everything()), 
+      cells_body(columns = 1)
+    )
+  ) %>%  
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Sans"), 
+      size = "medium", 
+      weight = "bold"
+    ),
+    locations = cells_column_spanners("Medals Won")
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Mono"), 
+      size = "large"
+    ),
+    locations = cells_body(columns = 2:4)
+  )
+
+gt_table_step_3
+```
+
+Notice how I used the `html()` helper function to define the subtitle. This allowed me to *color* "California" in the same color as the two breweries.
+
+The table is already starting to look quite compelling but there is still scope for a few more tweaks!
+
+## Let's spruce up the table with some emojis 😍
+
+Wouldn't it be nice to have actual images of medals as column header? Well, this is actually quite straight-forward to do and goes a long way in making your table even more appealing.
+
+But first you will need to install the `emo` package.
+
+```{r install-emo, eval=FALSE}
+devtools::install_github("hadley/emo")
+```
+
+Now, all you need to do is simply use the `col_label()` function to replace the column labels with fun emojis. While I'm at it, I'll also clear out the "brewery" column label since it seems a bit redundant (the subtitle already says that we are looking at breweries).
+
+```{r step-4}
+gt_table_step_4 <- gt_table_step_3 %>% 
+  cols_label(
+    brewery = "",
+    Gold = emo::ji("1st_place_medal"),
+    Silver = emo::ji("2nd_place_medal"),
+    Bronze = emo::ji("3rd_place_medal")
+  )
+
+gt_table_step_4
+```
+
+## `ggplot2` + `gt` a winning combination
+
+I guess that section says it all. You can add `ggplot` plots within your `gt` table. Although, this approach tends to be quite slow since behind the scenes, `gt` will convert your `ggplot` plots into images and then insert then into the table. A more effective way might be to use native HTML function to build simple visualizations.
+
+If you are interested in the latter approach, I would highly recommend reading Thomas Mock's blog post: [10+ Guidelines for Better Tables in R](https://themockup.blog/posts/2020-09-04-10-table-rules-in-r/) which has an example of using HTML to construct bar-plots.
+
+For our example though, we will stick to using `ggplot` to show the distribution of medals won over time for each of the 10 breweries.
+
+First, we will create a custom function, which creates a bar-plot for any given brewery name. I want to point out a couple of things here:
+
+- We use the original dataset, `beer_awards` instead of the "table data".
+- The year label sizes have deliberately given at a higher font size. This is because when `gt` converts then into smaller images, the text size also shrinks.
+
+```{r ggplot-function}
+plot_barchart <- function(brewery, data) {
+  
+  plot_data <- 
+    beer_awards %>% 
+    filter(brewery == {{ brewery }}) %>% 
+    count(year)
+
+  plot <- 
+    plot_data %>% 
+    ggplot(aes(year, n)) +
+    geom_col(fill = "#F28705", alpha = 0.75) +
+    geom_segment(aes(x = 1986.5, xend = 1986.5, y = -0.1, yend = -0.5)) +
+    geom_segment(aes(x = 2020.5, xend = 2020.5, y = -0.1, yend = -0.5)) +
+    geom_segment(aes(x = 1986.5, xend = 2020.5, y = -0.1, yend = -0.1)) +
+    annotate("text", x = 1986.5, y = -1.25, 
+             label = "1987", size = 10, color = "grey40") +
+    annotate("text", x = 2020.5, y = -1.25, 
+             label = "2020", size = 10, color = "grey40") +
+    scale_x_continuous(limits = c(1970, 2035)) +
+    scale_y_continuous(limits = c(-4, 10)) +
+    theme_void()    
+    
+  plot
+  
+}
+```
+
+Using this function, we can now add the `ggplot2` objects corresponding to each brewery to our "table data". We invoke the `purrr::map()` function to do this.
+
+```{r table-data-with-graphs}
+top_10_breweries_with_graphs <- top_10_breweries %>% 
+  mutate(plots = purrr::map(brewery, plot_barchart, data = beer_awards))
+```
+
+Finally, we can now add these plots to our `gt` table. To do this we use the `ggplot_image()` function inside of the `text_tranform()` function. What this essentially does is convert the `S3` `ggplot2` objects into images.
+
+Since, I had to change the table data, I'll have to re-apply the previous steps again. But the final result does seem worth the effort! 
+
+```{r step-5}
+gt_table_step_5 <- gt(top_10_breweries_with_graphs) %>% 
+  tab_style(
+    style = cell_text(color = "#F2CB05", weight = "bold"),
+    locations = cells_body(
+      columns = 1, 
+      rows = brewery %in% c("Firestone Walker Brewing Co.", "Marin Brewing Co.")
+    )
+  ) %>% 
+  tab_header(
+    title = "Great American Beer Festival",
+    subtitle = html(
+      "<span style = 'color: grey'>All time top 10 breweries of which 2 
+      are <span style = 'color: #F2CB05'><b>California</b></span> based</span>"
+    )
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("Titan One"), 
+      align = "left", 
+      size = "xx-large"
+    ),
+    locations = cells_title("title")
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Sans"), 
+      align = "left", 
+      size = "large"
+    ),
+    locations = cells_title("subtitle")
+  ) %>% 
+  tab_style(
+    style = cell_borders(
+      sides = "bottom", 
+      color = "#ebe8e8", 
+      weight = px(2)
+    ),
+    locations = cells_title("subtitle")
+  ) %>%
+  tab_spanner(
+    label = "Medals Won",
+    columns = 2:4
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Sans"), 
+      size = "large"
+    ),
+    locations = list(
+      cells_column_labels(everything()), 
+      cells_body(columns = 1)
+    )
+  ) %>%  
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Sans"), 
+      size = "medium", 
+      weight = "bold"
+    ),
+    locations = cells_column_spanners("Medals Won")
+  ) %>% 
+  tab_style(
+    style = cell_text(
+      font = google_font("IBM Plex Mono"), 
+      size = "large"
+    ),
+    locations = cells_body(columns = 2:4)
+  ) %>% 
+  cols_label(
+    brewery = "",
+    Gold = emo::ji("1st_place_medal"),
+    Silver = emo::ji("2nd_place_medal"),
+    Bronze = emo::ji("3rd_place_medal")
+  ) %>% 
+  #------------------------------------#
+  #  This is the section which is new  #
+  #------------------------------------#
+  text_transform(
+    locations = cells_body(vars(plots)),
+    fn = function(x) {
+      map(top_10_breweries_with_graphs$plots, ggplot_image, height = px(120), aspect_ratio = 1.5)
+    }
+  )
+
+gt_table_step_5
+```
+
+## Some final touches
+
+Phew, this almost completes our table! This was one roll-coaster of a ride but the end result does seem quite satisfying. Hope this resonates with you as well.
+
+For some final touches, I'll:
+
+- Add a source note to our table using the `tab_source_note()` function.
+- Specify column width to space out the brewery names from the medal tally using the `cols_width()` function.
+- Remove the top border from the table as well as the light grey lines separating the row. This can be done using the `tab_options()` function which controls the global settings of the table.
+
+```{r step-final}
+gt_table_step_final <- gt_table_step_5 %>% 
+  tab_source_note(md("**Data**: Great American Beer Festival | **Table**: Kaustav Sen")) %>% 
+  cols_width(
+    1 ~ px(300),
+    2:4 ~ px(50)
+  ) %>%
+  opt_table_font(font = google_font("IBM Plex Sans")) %>%  # Used to set the font for the source note
+  tab_options(
+    column_labels.border.top.color = "white",
+    column_labels.border.bottom.color = "black",
+    table.border.top.color = "white",
+    table.border.bottom.color = "white",
+    table_body.hlines.color = "white"
+  )
+gt_table_step_final
+```
+
+## Next steps
+
+Thanks for sticking till the end! Hope you picked up a few tricks along the way and enjoyed walking through the process of creating your first `gt` table. 
+
+I have just barely touched the surface of what's possible with `gt` and the learning process still continues. I have outlined here some of the sources which I have found beneficial in improving my table building skills:
+
+- I personally learned the ropes of using `gt` from Thomas's blog posts (https://themockup.blog/) which are an excellent entry point.
+- The `gt` website (https://gt.rstudio.com/) also has quite a useful examples to get your hands wet.
+- The RStudio Table Contest (https://community.rstudio.com/tag/table-contest) has some really interesting examples not only using `gt` but other equally excellent table packages available in `R`. In fact, this table contest gave me the final push to write this blog!
+- There have been quite a few posts on twitter as part of the #TidyTuesday challenge which very well demonstrates the prowess of this package. Here are some of my personal favorites:
+  - [Beyonce Albums](https://twitter.com/geokaramanis/status/1311332945618251777) by Georgios Karamanis
+  - [Public Spending on Education](https://twitter.com/committedtotape/status/1306364221735788546) by David Smale
+  - [NCAA Women's Basketball](https://twitter.com/schmid_07/status/1315720697092747266) by Bill Schmid
+
+If you spot any errors or have feedback, please feel free to reach out to via [twitter](https://twitter.com/kustav_sen) or [email](sen_kaustav@hotmail.com). Stay smart and keep learning!
