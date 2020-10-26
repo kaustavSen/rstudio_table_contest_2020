@@ -1,7 +1,7 @@
 ---
 title: "A first stroll through the `gt` package"
 author: "Kaustav Sen"
-date: "September 25, 2020"
+date: "October 25, 2020"
 output: 
   distill::distill_article:
     toc: true
@@ -87,7 +87,7 @@ This might look daunting at first, but fret not! With knowledge of just a few fu
 
 Also, all `gt` functions support the `%>%` operator. So, if you are coming from the `tidyverse` ecosystem, you will feel completely at home!
 
-Every `gt` table start with the `gt()` function which takes as the first argument a dataframe.
+Every `gt` table starts with the `gt()` function which takes as the first argument a dataframe.
 
 ```{r step-1}
 gt_table_step_1 <- gt(top_10_breweries)
@@ -381,12 +381,16 @@ Phew, this almost completes our table! This was one roll-coaster of a ride but t
 
 For some final touches, I'll:
 
+- Changing the column name for "plots" to "Medal Distribution 1987-2020".
 - Add a source note to our table using the `tab_source_note()` function.
 - Specify column width to space out the brewery names from the medal tally using the `cols_width()` function.
 - Remove the top border from the table as well as the light grey lines separating the row. This can be done using the `tab_options()` function which controls the global settings of the table.
 
 ```{r step-final}
 gt_table_step_final <- gt_table_step_5 %>% 
+  cols_label(
+    plots = md("**Medal Distribution<br>1987-2020**")
+  ) %>% 
   tab_source_note(md("**Data**: Great American Beer Festival | **Table**: Kaustav Sen")) %>% 
   cols_width(
     1 ~ px(300),
@@ -417,4 +421,4 @@ I have just barely touched the surface of what's possible with `gt` and the lear
   - [Public Spending on Education](https://twitter.com/committedtotape/status/1306364221735788546) by David Smale
   - [NCAA Women's Basketball](https://twitter.com/schmid_07/status/1315720697092747266) by Bill Schmid
 
-If you spot any errors or have feedback, please feel free to reach out to via [twitter](https://twitter.com/kustav_sen) or [email](sen_kaustav@hotmail.com). Stay smart and keep learning!
+If you spot any errors or have feedback, please feel free to reach out to via [twitter](https://twitter.com/kustav_sen) or [email](mailto:sen_kaustav@hotmail.com). Stay smart and keep learning!
